@@ -46,6 +46,10 @@ input,select{width:100%;font:inherit;padding:11px;border:1px solid var(--line);b
 .err{padding:8px 0;border-bottom:1px solid var(--line);font-size:15px}
 .hide{display:none}
 header{position:relative}
+#session{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+.ctrl{position:fixed;left:0;right:0;bottom:0;margin:0;z-index:20;background:var(--bg);border-top:1px solid var(--line);padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+#alert{position:fixed;left:12px;right:12px;bottom:calc(74px + env(safe-area-inset-bottom));max-width:536px;margin:0 auto;z-index:21;box-shadow:0 6px 24px #0004;padding:10px}
+#alert .btn{padding:10px;font-size:15px}
 .tools{position:absolute;left:10px;top:calc(10px + env(safe-area-inset-top));display:flex;gap:6px}
 .tools button{border:1px solid #ffffff55;background:#ffffff18;color:#fff;border-radius:8px;padding:4px 9px;font:600 14px Cairo}
 .bar{height:10px;background:var(--line);border-radius:6px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:var(--gold);width:0;transition:.4s}
@@ -181,7 +185,7 @@ async function fetchWords(n,from,to,only){
   const d=await surahData(n),out=[];
   d[0].ayahs.forEach((a,i)=>{const ay=a.numberInSurah;
     if(ay<from||ay>to||(only&&!only.has(ay)))return;
-    let u=a.text.trim().split(/\s+/),c=d[1].ayahs[i].text.trim().split(/\s+/);
+    let u=a.text.replace(/[\u06D6-\u06DC\u06DE\u06E9]/g,'').trim().split(/\s+/),c=d[1].ayahs[i].text.trim().split(/\s+/);
     if(n!==1&&n!==9&&ay===1&&u.length>4){u=u.slice(4);c=c.slice(4)}
     const sh=u.length===c.length?u:c;
     sh.forEach((w,k)=>out.push({t:w,n:norm(c[k]),ay,sr:n,last:k===sh.length-1}))});
