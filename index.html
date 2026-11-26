@@ -62,10 +62,15 @@ body.night{--bg:#0e1a17;--card:#15261f;--ink:#e6efe9;--mute:#9db3aa;--line:#2a44
 .night .w.cur{background:#44532f}.night .w.hid{background:#2a3a33}
 .night #alert{background:#2b1613}.night .list div.on{background:#1f3a2f}.night .tj{background:#1f3a2f;color:#9fe0c4}.tj{display:inline-block;background:#e3f1ea;color:var(--em);border-radius:8px;padding:3px 9px;margin:3px;font-size:13px}
 .note{font-size:12px;color:var(--mute);margin-top:6px}
+.ecard .eh{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--gold);padding-bottom:6px;margin-bottom:8px}
+.etx{font:400 22px/2.1 'Amiri Quran',serif;text-align:justify}
+.ew{background:var(--bad);color:#fff;border-radius:6px;padding:0 3px}
+.ecard .row .btn{margin-top:8px;font-size:15px;padding:10px}
+.w.tgt{text-decoration:underline wavy var(--bad);text-underline-offset:8px}
 </style>
 </head>
 <body>
-<header><div class="tools"><button id="fp">أ+</button><button id="fm">أ−</button><button id="nt">🌙</button></div><h1>وَرَتِّلِ الْقُرْآنَ تَرْتِيلًا</h1><p>سَمِّع، وتابع حفظك، وصحّح أخطاءك</p></header>
+<header><div class="tools"><button id="fp">أ+</button><button id="fm">أ−</button><button id="nt">🌙</button><button id="sbBtn" style="display:none">☁</button></div><h1>وَرَتِّلِ الْقُرْآنَ تَرْتِيلًا</h1><p>سَمِّع، وتابع حفظك، وصحّح أخطاءك</p></header>
 <main>
 
 <section id="home">
@@ -128,6 +133,12 @@ body.night{--bg:#0e1a17;--card:#15261f;--ink:#e6efe9;--mute:#9db3aa;--line:#2a44
   <div id="tafBox" class="card hide" style="margin-top:10px;font-size:15px;line-height:1.9"></div>
 </section>
 
+<section id="errors" class="hide">
+  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b>قسم الأخطاء</b><span id="ecount" class="note"></span></div>
+  <div class="row"><button class="btn alt" id="ebk">رجوع</button><button class="btn gold" id="practiceAll">تدرّب على الكل</button></div></div>
+  <div id="elist"></div>
+</section>
+
 <section id="report" class="hide">
   <div class="card">
     <div class="stat" id="acc"></div>
@@ -139,6 +150,9 @@ body.night{--bg:#0e1a17;--card:#15261f;--ink:#e6efe9;--mute:#9db3aa;--line:#2a44
 </section>
 
 </main>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="sync.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 const API='https://api.alquran.cloud/v1/';
@@ -188,10 +202,10 @@ async function fetchWords(n,from,to,only){
     let u=a.text.replace(/[\u06D6-\u06DC\u06DE\u06E9]/g,'').trim().split(/\s+/),c=d[1].ayahs[i].text.trim().split(/\s+/);
     u=u.filter(t=>norm(t));c=c.filter(t=>norm(t));if(n!==1&&n!==9&&ay===1&&u.length>4){u=u.slice(4);c=c.slice(4)}
     const sh=u.length===c.length?u:c;
-    sh.forEach((w,k)=>out.push({t:w,n:norm(c[k]),ay,sr:n,last:k===sh.length-1}))});
+    sh.forEach((w,k)=>out.push({t:w,n:norm(c[k]),ay,sr:n,k,last:k===sh.length-1}))});
   return out}
-function begin(title,list,rev){
-  words=list;ptr=0;isRev=!!rev;stats={ok:0,errs:[],first:new Set()};sessTitle=title;
+function begin(title,list,rev,focus){
+  S.focus=focus||null;S.back=focus?'errors':'home';words=list;ptr=0;isRev=!!rev;stats={ok:0,errs:[],first:new Set()};sessTitle=title;
   $('#title').textContent=title;$('#tafBox').classList.add('hide');tk='';
   drawText();show('session');
   if(S.kind==='talq')teachNext(true);else startRec()}
@@ -202,15 +216,10 @@ $('#start').onclick=async()=>{
   $('#start').textContent='جارٍ التحميل…';
   try{const w=await fetchWords(n,from,to);$('#start').textContent='ابدأ التسميع';begin(`${sn(n)} (${toAr(from)}–${toAr(to)})`,w,false)}
   catch(e){$('#start').textContent='ابدأ التسميع';alert('تعذر تحميل الآيات. تأكد من الإنترنت')}};
-$('#review').onclick=async()=>{
-  if(!SR)return alert('متصفحك لا يدعم التعرف على الصوت');
-  const weak=JSON.parse(localStorage.getItem('weak')||'[]');if(!weak.length)return;
-  try{const by={};weak.forEach(x=>(by[x.s]=by[x.s]||new Set()).add(x.ay));
-    let all=[];for(const n of Object.keys(by).map(Number).sort((a,b)=>a-b))all=all.concat(await fetchWords(n,1,300,by[n]));
-    begin('مراجعة أخطائي',all,true)}catch(e){alert('تعذر تحميل الآيات. تأكد من الإنترنت')}};
+$('#review').onclick=()=>{renderErrs();show('errors')};
 
 function drawText(){let h='',last=0;
-  words.forEach((w,i)=>{h+=`<span class="w ${S.mode==='hide'?'hid':''}" data-i="${i}">${w.t}</span> `;if(w.last)h+=`<span class="num">﴿${toAr(w.ay)}﴾</span> `});
+  words.forEach((w,i)=>{h+=`<span class="w ${S.mode==='hide'?'hid':''}${S.focus&&S.focus.has(w.sr+':'+w.ay+':'+w.k)?' tgt':''}" data-i="${i}">${w.t}</span> `;if(w.last)h+=`<span class="num">﴿${toAr(w.ay)}﴾</span> `});
   $('#quran').innerHTML=h;spans=[...document.querySelectorAll('.w')];mark()}
 function mark(){spans.forEach((s,i)=>{s.classList.toggle('cur',i===ptr)});if(spans[ptr])spans[ptr].scrollIntoView({block:'center',behavior:'smooth'});tjPanel();if(words[ptr])getAudio(words[ptr].sr,words[ptr].ay);if(words[ptr]&&!$('#tafBox').classList.contains('hide')){const k=words[ptr].sr+':'+words[ptr].ay;if(k!==tk)showTaf()}}
 
@@ -242,7 +251,7 @@ function judge(w,last){const e=words[ptr].n;
   if(same(w,e))return 1;
   if(last&&(e.startsWith(w)||(w.length<e.length&&lev(w,e.slice(0,w.length))<=1)))return 0;
   return -1}
-function accept(){const w=words[ptr];spans[ptr].className='w ok';stats.ok++;stats.first.add(ptr);ptr++;
+function accept(){const w=words[ptr];if(isRev&&!stats.errs.some(e=>e.sr===w.sr&&e.ay===w.ay&&e.k===w.k))resolve(w.sr,w.ay,w.k);spans[ptr].className='w ok';stats.ok++;stats.first.add(ptr);ptr++;
   if(w.last){addDay();
     if(isRev&&!stats.errs.some(e=>e.ay===w.ay&&e.sr===w.sr))unweak(w.sr,w.ay);
     if(S.kind==='talq'&&ptr<=words.length&&--repLeft>0){rewind(w);return false}}
@@ -252,11 +261,29 @@ function accept(){const w=words[ptr];spans[ptr].className='w ok';stats.ok++;stat
 function rewind(w){ptr=words.findIndex(x=>x.ay===w.ay&&x.sr===w.sr);
   spans.forEach((sp,i)=>{if(words[i].ay===w.ay&&words[i].sr===w.sr)sp.className='w'+(S.mode==='hide'?' hid':'')});
   $('#state').textContent='أعد الآية ('+toAr(repLeft)+' متبقية)';mark()}
-function fail(w){const exp=words[ptr];errIdx=ptr;stats.errs.push({ay:exp.ay,sr:exp.sr,exp:exp.t,said:w});
-  const wk=JSON.parse(localStorage.getItem('weak')||'[]');
-  if(!wk.some(x=>x.s===exp.sr&&x.ay===exp.ay)){wk.push({s:exp.sr,ay:exp.ay});localStorage.setItem('weak',JSON.stringify(wk.slice(-60)))}
+function fail(w){const exp=words[ptr];errIdx=ptr;stats.errs.push({ay:exp.ay,sr:exp.sr,k:exp.k,exp:exp.t,said:w});recErr(exp,w);
   spans[ptr].className='w bad';stopRec();showAlert(exp)}
-function unweak(sr,ay){const wk=JSON.parse(localStorage.getItem('weak')||'[]').filter(x=>!(x.s===sr&&x.ay===ay));localStorage.setItem('weak',JSON.stringify(wk))}
+// ---- قسم الأخطاء: كل خطأ سجل مستقل (سورة + آية + كلمة) ----
+const errs=()=>JSON.parse(localStorage.getItem('errors')||'[]');
+const saveErrs=l=>localStorage.setItem('errors',JSON.stringify(l.slice(-500)));
+function recErr(exp,said){const l=errs(),id=exp.sr+':'+exp.ay+':'+exp.k,f=l.find(e=>e.id===id),
+  tx=words.filter(x=>x.sr===exp.sr&&x.ay===exp.ay).map(x=>x.t).join(' ');
+  if(f){f.n++;f.said=said;f.at=Date.now();f.tx=tx}else l.push({id,sr:exp.sr,ay:exp.ay,k:exp.k,w:exp.t,said,tx,n:1,at:Date.now()});saveErrs(l)}
+function resolve(sr,ay,k){const l=errs(),m=l.filter(x=>!(x.sr===sr&&x.ay===ay&&x.k===k));if(m.length!==l.length)saveErrs(m)}
+function unweak(sr,ay){const l=errs(),m=l.filter(x=>!(x.sr===sr&&x.ay===ay&&x.k===-1));if(m.length!==l.length)saveErrs(m)}
+function renderErrs(){const l=errs().sort((a,b)=>a.sr-b.sr||a.ay-b.ay||a.k-b.k);$('#ecount').textContent=toAr(l.length)+' خطأ';
+  $('#elist').innerHTML=l.length?l.map(x=>{const t=x.tx?x.tx.split(' ').map((w,i)=>i===x.k?`<mark class="ew">${w}</mark>`:w).join(' '):'';
+    return `<div class="card ecard" data-id="${x.id}"><div class="eh"><b>${sn(x.sr)} — الآية ${toAr(x.ay)}</b><small>${x.n>1?'تكرر '+toAr(x.n)+' مرات':''}</small></div>${t?`<div class="etx">${t}</div>`:''}${x.w?`<div class="note">الصحيح: <b>${x.w}</b>${x.said?' — قلتَ: '+x.said:''}</div>`:'<div class="note">آية ضعيفة (سُجّلت سابقًا)</div>'}<div class="row"><button class="btn" data-a="p">تدرّب على هذا الخطأ</button><button class="btn alt" data-a="d">حذف</button></div></div>`}).join(''):'<div class="card">لا توجد أخطاء مسجّلة 🎉</div>'}
+async function practice(items,title){
+  if(!SR)return alert('متصفحك لا يدعم التعرف على الصوت');
+  try{const by={};items.forEach(x=>(by[x.sr]=by[x.sr]||new Set()).add(x.ay));
+    let all=[];for(const n of Object.keys(by).map(Number).sort((a,b)=>a-b))all=all.concat(await fetchWords(n,1,300,by[n]));
+    begin(title,all,true,new Set(items.map(x=>x.id)))}catch(e){alert('تعذر تحميل الآيات. تأكد من الإنترنت')}}
+$('#elist').onclick=e=>{const b=e.target.closest('[data-a]');if(!b)return;const id=b.closest('[data-id]').dataset.id,x=errs().find(y=>y.id===id);if(!x)return;
+  if(b.dataset.a==='d'){saveErrs(errs().filter(y=>y.id!==id));renderErrs();goalUI()}else practice([x],`${sn(x.sr)} — الآية ${toAr(x.ay)}`)};
+$('#practiceAll').onclick=()=>{const l=errs();if(l.length)practice(l,'مراجعة أخطائي')};
+$('#ebk').onclick=()=>{goalUI();show('home')};
+$('#sbBtn').onclick=()=>window.SB&&SB.login&&SB.login();
 function teachNext(first){
   if(!first)stopRec();
   const w=words[ptr];curAyah=w.ay;curSr=w.sr;repLeft=+$('#rep').value;mark();
@@ -276,9 +303,9 @@ const gl=()=>+localStorage.getItem('goal')||10;
 const days=()=>JSON.parse(localStorage.getItem('days')||'{}');
 function addDay(){const d=days(),k=dk(new Date());d[k]=(d[k]||0)+1;localStorage.setItem('days',JSON.stringify(d));if(d[k]===gl())$('#state').textContent='🌟 أتممت هدف اليوم'}
 function streak(){const d=days();let n=0,t=new Date();if((d[dk(t)]||0)<gl())t.setDate(t.getDate()-1);while((d[dk(t)]||0)>=gl()){n++;t.setDate(t.getDate()-1)}return n}
-function goalUI(){const c=days()[dk(new Date())]||0,g=gl(),w=JSON.parse(localStorage.getItem('weak')||'[]');
+function goalUI(){const c=days()[dk(new Date())]||0,g=gl(),w=errs();
   $('#gbar').style.width=Math.min(100,100*c/g)+'%';$('#gtxt').textContent=`${toAr(c)} / ${toAr(g)} آية اليوم`;$('#streak').textContent='🔥 '+toAr(streak())+' يوم متتالي';
-  $('#goal').value=g;$('#review').style.display=w.length?'block':'none';$('#review').textContent=`راجع أخطائي (${toAr(w.length)} آية)`}
+  $('#goal').value=g;$('#review').style.display=w.length?'block':'none';$('#review').textContent=`قسم الأخطاء (${toAr(w.length)})`}
 $('#goal').onchange=()=>{localStorage.setItem('goal',Math.max(1,+$('#goal').value||10));goalUI()};
 
 let fs=+localStorage.getItem('fs')||26;
@@ -335,13 +362,14 @@ function finish(){
   $('#adv').textContent=stats.errs.length?'راجع الكلمات التالية ثم أعد الجلسة:':'لم تُسجَّل أخطاء. بارك الله فيك!';
   $('#errs').innerHTML=stats.errs.map(e=>`<div class="err">${sn(e.sr)} — الآية ${toAr(e.ay)}: الصحيح <b style="font-family:'Amiri Quran';font-size:20px">${e.exp}</b></div>`).join('');
   const h=JSON.parse(localStorage.getItem('hist')||'[]');
-  h.unshift({name:sessTitle,from:words[0]?words[0].ay:1,to:words.length?words[words.length-1].ay:1,acc,date:new Date().toLocaleDateString('ar-EG')});
+  h.unshift({id:crypto.randomUUID(),rev:isRev,at:Date.now(),name:sessTitle,from:words[0]?words[0].ay:1,to:words.length?words[words.length-1].ay:1,acc,date:new Date().toLocaleDateString('ar-EG')});
   localStorage.setItem('hist',JSON.stringify(h.slice(0,15)));
   show('report');
 }
-$('#again').onclick=()=>{history();goalUI();show('home')};
-function show(id){['home','session','report'].forEach(x=>$('#'+x).classList.toggle('hide',x!==id));window.scrollTo(0,0)}
+$('#again').onclick=()=>{history();goalUI();if(S.back==='errors'){renderErrs();show('errors')}else show('home')};
+function show(id){['home','session','report','errors'].forEach(x=>$('#'+x).classList.toggle('hide',x!==id));window.scrollTo(0,0)}
 
+(()=>{const o=localStorage.getItem('weak');if(!o)return;const l=errs();JSON.parse(o).forEach(x=>{if(!l.some(e=>e.sr===x.s&&e.ay===x.ay))l.push({id:x.s+':'+x.ay+':-1',sr:x.s,ay:x.ay,k:-1,w:'',said:'',tx:'',n:1,at:Date.now()})});saveErrs(l);localStorage.removeItem('weak')})();
 history();goalUI();applyView();loadSurahs();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
