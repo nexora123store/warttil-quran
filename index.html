@@ -6,6 +6,10 @@
 <meta name="theme-color" content="#14574a">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ورتل">
 <title>ورتل القرآن ترتيلا</title>
 <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -74,6 +78,8 @@ body.night{--bg:#0e1a17;--card:#15261f;--ink:#e6efe9;--mute:#9db3aa;--line:#2a44
 <main>
 
 <section id="home">
+  <button class="btn gold" id="inst" style="display:none;margin:0 0 12px">📲 ثبّت التطبيق على جهازك</button>
+  <div class="card note" id="iosNote" style="display:none;font-size:14px">لتثبيت التطبيق: اضغط زر المشاركة <b>⬆</b> في Safari ثم <b>إضافة إلى الشاشة الرئيسية</b>.</div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;font-weight:700"><span id="gtxt"></span><span id="streak"></span></div>
     <div class="bar"><i id="gbar"></i></div>
@@ -370,6 +376,11 @@ $('#again').onclick=()=>{history();goalUI();if(S.back==='errors'){renderErrs();s
 function show(id){['home','session','report','errors'].forEach(x=>$('#'+x).classList.toggle('hide',x!==id));window.scrollTo(0,0)}
 
 (()=>{const o=localStorage.getItem('weak');if(!o)return;const l=errs();JSON.parse(o).forEach(x=>{if(!l.some(e=>e.sr===x.s&&e.ay===x.ay))l.push({id:x.s+':'+x.ay+':-1',sr:x.s,ay:x.ay,k:-1,w:'',said:'',tx:'',n:1,at:Date.now()})});saveErrs(l);localStorage.removeItem('weak')})();
+let dip=null;const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();dip=e;if(!standalone)$('#inst').style.display='block'});
+$('#inst').onclick=async()=>{if(!dip)return;dip.prompt();await dip.userChoice;dip=null;$('#inst').style.display='none'};
+addEventListener('appinstalled',()=>$('#inst').style.display='none');
+if(/iphone|ipad|ipod/i.test(navigator.userAgent)&&!standalone)$('#iosNote').style.display='block';
 history();goalUI();applyView();loadSurahs();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
