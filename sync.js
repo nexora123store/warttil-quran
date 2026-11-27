@@ -21,7 +21,7 @@ async function push0(){if(!await ready)return;
  if(a.data&&a.data.length){si.call(localStorage,'errors',JSON.stringify(a.data.map(r=>({id:r.surah+':'+r.ayah+':'+r.word_index,sr:r.surah,ay:r.ayah,k:r.word_index,w:r.word,said:r.said,tx:r.ayah_text,n:r.mistake_count,at:Date.parse(r.last_at)}))));ch=1}
  if(b.data&&b.data.length){const d={};b.data.forEach(r=>d[r.day]=r.ayahs);si.call(localStorage,'days',JSON.stringify(d));ch=1}
  if(c.data){si.call(localStorage,'goal',c.data.daily_goal);si.call(localStorage,'fs',c.data.font_size);si.call(localStorage,'night',c.data.night_mode?'1':'0');ch=1}
- if(ch)location.reload()})();
+ if(ch&&window.goalUI)goalUI()})();
 Storage.prototype.setItem=function(k,v){si.call(this,k,v);if(['errors','days','hist','goal','fs','night'].includes(k)){clearTimeout(t);t=setTimeout(push,3000)}};
 ready.then(()=>{if((L('errors')||[]).length)push()});
 SB.login=async()=>{alert('الحالة: '+st+'\nأخطاء محلية: '+(L('errors')||[]).length);if(!confirm('تربط حسابك بالإيميل؟'))return;const email=prompt('بريدك الإلكتروني (لربط بياناتك بين الأجهزة)');if(!email)return;
